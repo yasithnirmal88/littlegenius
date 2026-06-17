@@ -347,139 +347,193 @@ export default function DashboardPage() {
   )
 }
 
-// ─── PATH TAB ───────────────────────────────────────────────────────────
+// ─── PATH TAB (Duolingo-style glossy 3D) ─────────────────────────────
 function PathTab({ modules, progress, onSelect, profile, unlockedMods = {} }) {
-  const CANVAS_W = 320
-  const NODE_STEP = 78
-  const totalH = Math.max(modules.length * NODE_STEP + 100, 400)
-
-  const nodeX = [35, 65, 45, 25, 55, 75, 50, 30]
-  const realPts = modules.map((m, i) => ({
-    x: (nodeX[i % nodeX.length] / 100) * (CANVAS_W - 80) + 20,
-    y: i * NODE_STEP + 60,
-  }))
-
-  const makePath = (pts) =>
-    pts.reduce((d, p, i) => {
-      if (i === 0) return `M${p.x},${p.y}`
-      const prev = pts[i - 1]
-      const cx = (prev.x + p.x) / 2
-      return d + ` C${cx},${prev.y} ${cx},${p.y} ${p.x},${p.y}`
-    }, '')
-
-  const completedCount = modules.filter((m) => (progress[m.id]?.stars || 0) > 0).length
-  const donePts = realPts.slice(0, Math.max(1, completedCount + 1))
+  const scienceIcons = ['🧪', '🔬', '🚀', '⚛️', '🔭', '🧬', '⚗️', '🧲']
+  const nodeColors = ['#FFC800', '#1CB0F6', '#8B5CF6', '#FF4B82', '#00B894', '#FD79A8', '#6C5CE7', '#00CEC9']
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', background: '#f0f4ff' }}>
-      <div
-        style={{
-          background: 'linear-gradient(135deg,#667eea,#764ba2)',
-          margin: 12,
-          borderRadius: 16,
-          padding: '12px 16px',
-          color: 'white',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
+    <div style={{ flex: 1, overflowY: 'auto', background: '#F0F4F8' }}>
+      {/* Duo-Style Header Pill Badges */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '12px 16px 8px',
+      }}>
+        <div style={pillStyle('#FF9600')}><span style={{fontSize:16}}>🔥</span> {profile?.streak || '0'}</div>
+        <div style={pillStyle('#1CB0F6')}><span style={{fontSize:16}}>💎</span> {profile?.xp?.toLocaleString() || '0'}</div>
+        <div style={pillStyle('#FF4B82')}><span style={{fontSize:16}}>⚡</span> 25</div>
+        <div style={{ flex: 1 }} />
+      </div>
+
+      {/* Unit Banner */}
+      <div style={{
+        background: 'linear-gradient(180deg,#8B5CF6 0%,#6D3FD9 100%)',
+        margin: '0 14px 8px', borderRadius: 16, padding: '14px 18px',
+        color: 'white', display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', boxShadow: '0 4px 0 rgba(0,0,0,0.12)',
+      }}>
         <div>
-          <div style={{ fontSize: 11, opacity: 0.8 }}>Rank</div>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>
-            🎖️ {profile?.rank || 'Science Cadet'}
+          <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.85, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+            {profile?.rank || 'Science Cadet'}
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2 }}>
+            🎖️ {profile?.username || 'Explorer'}
           </div>
         </div>
-        <div>
-          <div style={{ fontSize: 11, opacity: 0.8 }}>XP</div>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>
-            {profile?.xp?.toLocaleString() || '0'}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, opacity: 0.8 }}>🔥 Streak</div>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>{profile?.streak || '0'}</div>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'rgba(255,255,255,0.18)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, cursor: 'pointer',
+        }} onClick={() => onSelect?.({ id: 'profile' })}>
+          ☰
         </div>
       </div>
-      <div style={{ position: 'relative', width: '100%' }}>
-        <svg width="100%" viewBox={`0 0 ${CANVAS_W} ${totalH}`} style={{ display: 'block' }}>
-          {/* Background science icons */}
-          {[1,2,3,4,5,6,7,8].map((n) => {
-            const icons = ['🧪','🔬','🚀','⚛️','🔭','🧬','⚗️','🧲','💡','🔋','🛸','🌡️']
-            const icon = icons[(n * 7) % icons.length]
-            const bx = 15 + ((n * 37) % (CANVAS_W - 40))
-            const by = 20 + ((n * 53) % (totalH - 60))
-            return (
-              <text key={n} x={bx} y={by} fontSize={14} opacity={0.08}>
-                {icon}
-              </text>
-            )
-          })}
-          {[1,2,3,4,5,6].map((n) => {
-            const icons = ['🧪','🔬','⚗️','🧬']
-            const icon = icons[(n * 11) % icons.length]
-            const bx = 280 - ((n * 29) % 80)
-            const by = 40 + ((n * 47) % (totalH - 80))
-            return (
-              <text key={`r${n}`} x={bx} y={by} fontSize={11} opacity={0.06}>
-                {icon}
-              </text>
-            )
-          })}
-          <path d={makePath(realPts)} fill="none" stroke="#dde3f0" strokeWidth={10} strokeLinecap="round" />
-          <path d={makePath(donePts)} fill="none" stroke="#A29BFE" strokeWidth={10} strokeLinecap="round" />
-          <path
-            d={makePath(donePts)}
-            fill="none"
-            stroke="white"
-            strokeWidth={3}
-            strokeLinecap="round"
-            strokeDasharray="6 10"
-            opacity={0.5}
-          />
-          {modules.map((mod, i) => {
-            const x = realPts[i].x
-            const y = realPts[i].y
-            const cs = ['#FF6B6B', '#FF9F43', '#48DBFB', '#1DD1A1', '#A29BFE', '#FD79A8', '#FDCB6E', '#6C5CE7']
-            const modProgress = progress[mod.id]
-            const stars = modProgress?.stars || 0
-            const effectivelyLocked = mod.locked && !unlockedMods[mod.id] && stars === 0
-            const bg = effectivelyLocked ? '#b2bec3' : cs[i % cs.length]
-            const isActive = !effectivelyLocked || stars < 3
 
-            return (
-              <g
-                key={mod.id}
-                onClick={() => !effectivelyLocked && onSelect(mod)}
-                style={{ cursor: effectivelyLocked ? 'not-allowed' : 'pointer' }}
-              >
-                {isActive && <circle cx={x} cy={y} r={30} fill={bg} opacity={0.12} />}
-                <circle cx={x} cy={y + 3} r={20} fill="#0000001a" />
-                <circle cx={x} cy={y} r={20} fill={bg} stroke="white" strokeWidth={2.5} />
-                <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={effectivelyLocked ? 14 : 16}>
-                  {effectivelyLocked ? '🔒' : stars >= 3 ? '✅' : mod.emoji}
-                </text>
-                {[0, 1, 2].map((s) => (
-                  <text key={s} x={x - 10 + s * 10} y={y + 32} textAnchor="middle" fontSize={9}>
-                    {s < stars ? '⭐' : '☆'}
-                  </text>
-                ))}
-                <text x={x} y={y + 46} textAnchor="middle" fontSize={9} fontWeight="600" fill="#636e72">
-                  {mod.title}
-                </text>
-                {isActive && (
-                  <circle cx={x} cy={y} r={22} fill="none" stroke={bg} strokeWidth={1.5} opacity={0.5} strokeDasharray="3 4" />
-                )}
-              </g>
-            )
-          })}
+      {/* Glossy Path */}
+      <div style={{ position: 'relative', padding: '20px 0 60px' }}>
+        {/* Winding connector line */}
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
+          <path
+            d={modules.map((m, i) => {
+              const cx = 195 + (i % 2 === 0 ? -78 : 78)
+              const cy = i * 108 + 72
+              return i === 0 ? `M${cx},${cy}` : `Q${195},${cy - 54} ${cx},${cy}`
+            }).join(' ')}
+            fill="none" stroke="#E0E5EC" strokeWidth="8" strokeLinecap="round"
+          />
+          <path
+            d={modules.map((m, i) => {
+              if ((progress[m.id]?.stars || 0) === 0 && i > 0) return ''
+              const cx = 195 + (i % 2 === 0 ? -78 : 78)
+              const cy = i * 108 + 72
+              return i === 0 ? `M${cx},${cy}` : `Q${195},${cy - 54} ${cx},${cy}`
+            }).filter(Boolean).join(' ')}
+            fill="none" stroke="#A29BFE" strokeWidth="8" strokeLinecap="round"
+          />
         </svg>
-        <div style={{ textAlign: 'center', paddingBottom: 20, color: '#aaa', fontSize: 13 }}>
-          🔒 Keep going to unlock more!
+
+        {modules.map((mod, i) => {
+          const stars = progress[mod.id]?.stars || 0
+          const locked = mod.locked && !unlockedMods[mod.id] && stars === 0
+          const colorIdx = i % nodeColors.length
+          const fill = locked ? '#E5E5E5' : nodeColors[colorIdx]
+          const shadowColor = locked ? '#C8C8C8' : nodeColors[(colorIdx + 1) % nodeColors.length]
+          const isBig = i === modules.length - 1
+          const offset = i % 2 === 0 ? -78 : 78
+          const icon = locked ? '🔒' : stars >= 3 ? '✅' : scienceIcons[i % scienceIcons.length]
+
+          return (
+            <div key={mod.id} style={{ marginBottom: locked && i < modules.length - 1 ? 4 : 0 }}>
+              {/* Node */}
+              <div style={{
+                display: 'flex', justifyContent: 'center',
+                transform: `translateX(${offset}px)`,
+                position: 'relative', zIndex: 1,
+              }}>
+                <button
+                  onClick={() => !locked && onSelect(mod)}
+                  disabled={locked}
+                  style={{
+                    width: isBig ? 92 : 76, height: isBig ? 92 : 76,
+                    borderRadius: '50%', border: 'none', cursor: locked ? 'not-allowed' : 'pointer',
+                    position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: fill,
+                    boxShadow: `0 ${isBig ? 10 : 8}px 0 ${shadowColor}`,
+                    transition: 'transform 0.15s',
+                  }}
+                >
+                  {/* Glossy highlight */}
+                  <div style={{
+                    position: 'absolute', top: isBig ? 10 : 8, left: isBig ? 17 : 14,
+                    width: isBig ? 42 : 36, height: isBig ? 22 : 18,
+                    borderRadius: '50%',
+                    background: locked ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.35)',
+                    pointerEvents: 'none',
+                  }} />
+                  <span style={{
+                    position: 'relative', zIndex: 2,
+                    fontSize: isBig ? 34 : 28,
+                    opacity: locked ? 0.45 : 1,
+                    filter: locked ? 'grayscale(1)' : 'none',
+                  }}>
+                    {icon}
+                  </span>
+                </button>
+              </div>
+              {/* Stars */}
+              <div style={{
+                display: 'flex', justifyContent: 'center', gap: 4,
+                marginTop: -2, transform: `translateX(${offset}px)`,
+              }}>
+                {[0, 1, 2].map(s => (
+                  <span key={s} style={{ fontSize: 12, color: s < stars ? '#FFC800' : '#D9D9D9' }}>
+                    {s < stars ? '⭐' : '☆'}
+                  </span>
+                ))}
+              </div>
+              {/* Label */}
+              <div style={{
+                textAlign: 'center', fontSize: 11, fontWeight: 700, color: locked ? '#B0B0B0' : '#3C3C3C',
+                marginTop: 2, transform: `translateX(${offset}px)`,
+                maxWidth: 120, marginLeft: 'auto', marginRight: 'auto',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {mod.title}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Companion Planet */}
+        <div style={{
+          position: 'absolute', left: 24, top: Math.min(modules.length * 108 / 2, 220),
+          display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2,
+        }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: '50%',
+            background: 'radial-gradient(circle at 30% 28%, #B98CFF 0%, #8B5CF6 55%, #6D3FD9 100%)',
+            boxShadow: '0 6px 0 #5A32B3', position: 'relative',
+          }}>
+            <div style={{
+              position: 'absolute', top: '50%', left: -10,
+              width: 84, height: 18, border: '4px solid #D9B8FF',
+              borderRadius: '50%',
+              transform: 'translateY(-50%) rotate(-10deg)',
+              opacity: 0.85, pointerEvents: 'none',
+            }} />
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#777', marginTop: 4 }}>Nova</div>
+        </div>
+
+        {/* Discovery Chest */}
+        <div style={{
+          display: 'flex', justifyContent: 'center', margin: '4px 0',
+          transform: 'translateX(78px)',
+        }}>
+          <div style={{
+            width: 56, height: 56, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 32,
+          }}>
+            🏆
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', padding: '8px 0 24px', color: '#aaa', fontSize: 12, fontWeight: 600 }}>
+          🔒 Keep exploring to unlock more!
         </div>
       </div>
     </div>
   )
+}
+
+function pillStyle(accent) {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    fontWeight: 800, fontSize: 14, color: '#3C3C3C',
+    background: 'white', borderRadius: 20,
+    padding: '4px 12px', boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+  }
 }
 
 // ─── MODULE MODAL ───────────────────────────────────────────────────────
