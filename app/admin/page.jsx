@@ -297,6 +297,7 @@ function AdminModules({ supabase, modules, setModules }) {
   }
 
   const del = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this module?")) return;
     await supabase.from('modules').delete().eq('id', id)
     setModules((ms) => ms.filter((m) => m.id !== id))
   }
@@ -455,7 +456,8 @@ function AdminLessons({ supabase, lessons, setLessons, modules }) {
     setShowForm(false)
   }
 
-  const del = async (id) => {
+const del = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this lesson?")) return;
     await supabase.from('lessons').delete().eq('id', id)
     setLessons((ls) => ls.filter((l) => l.id !== id))
   }
@@ -596,7 +598,8 @@ function AdminShorts({ supabase, shorts, setShorts, modules }) {
     setShowForm(false)
   }
 
-  const del = async (id) => {
+const del = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this short?")) return;
     await supabase.from('shorts').delete().eq('id', id)
     setShorts((ss) => ss.filter((s) => s.id !== id))
   }
@@ -844,7 +847,8 @@ function AdminQuizzes({ supabase, quizzes, setQuizzes, modules }) {
     setShowForm(false)
   }
 
-  const del = async (id) => {
+ const del = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this quiz?")) return;
     await supabase.from('quizzes').delete().eq('id', id)
     setQuizzes((qs) => qs.filter((q) => q.id !== id))
   }
@@ -870,7 +874,8 @@ function AdminQuizzes({ supabase, quizzes, setQuizzes, modules }) {
     setShowQuestionForm(false)
   }
 
-  const delQuestion = async (questionId, quizId) => {
+const delQuestion = async (questionId, quizId) => {
+    if (!window.confirm("Are you sure you want to delete this question?")) return;
     await supabase.from('quiz_questions').delete().eq('id', questionId)
     setQuizzes((qs) => qs.map((q) => (q.id === quizId ? { ...q, quiz_questions: (q.quiz_questions || []).filter((qq) => qq.id !== questionId) } : q)))
   }
