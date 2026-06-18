@@ -215,6 +215,63 @@ function StatCard({ icon, label, value, color }) {
 }
 
 // ─── ADMIN MODULES ─────────────────────────────────────────────────────
+function VideoUploadBtn({ bucket, onUploaded }) {
+  const [uploading, setUploading] = useState(false)
+  const [url, setUrl] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setUrl('')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('bucket', bucket)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (data.url) {
+        setUrl(data.url)
+        if (onUploaded) onUploaded(data.url)
+      } else {
+        alert('Upload failed: ' + (data.error || 'unknown error'))
+      }
+    } catch (err) {
+      alert('Upload error: ' + err.message)
+    }
+    setUploading(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <input type="file" accept="video/*" onChange={handleFile} style={{ display: 'none' }} id={`file-${bucket}`} />
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Btn
+          onClick={() => document.getElementById(`file-${bucket}`).click()}
+          color="#00b894" outline
+          disabled={uploading}
+        >
+          {uploading ? '⏳ Uploading...' : `📹 Upload ${bucket === 'module-videos' ? 'Module' : 'Short'} Video`}
+        </Btn>
+        {url && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 11, color: '#00b894', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>
+              ✅ {url.split('/').pop()}
+            </span>
+            <button
+              onClick={() => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+              style={{ background: '#00b89422', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 11, color: '#00b894', fontWeight: 700, flexShrink: 0 }}
+            >
+              {copied ? 'Copied!' : 'Copy URL'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AdminModules({ supabase, modules, setModules }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({})
@@ -304,11 +361,7 @@ function AdminModules({ supabase, modules, setModules }) {
       )}
 
       {/* Upload video button for modules */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Btn onClick={() => alert('Upload module video: connect to Supabase Storage bucket "module-videos"')} color="#00b894" outline>
-          📹 Upload Module Video
-        </Btn>
-      </div>
+      <VideoUploadBtn bucket="module-videos" />
 
       {modules.map((mod) => {
         const tierColors = { 1: '#667eea', 2: '#e17055', 3: '#00b894', 4: '#fd79a8' }
@@ -563,11 +616,7 @@ function AdminShorts({ supabase, shorts, setShorts, modules }) {
       </div>
 
       {/* Upload buttons */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Btn onClick={() => alert('Upload short video: connect to Supabase Storage bucket "short-videos"')} color="#00b894" outline>
-          📹 Upload Short Video
-        </Btn>
-      </div>
+      <VideoUploadBtn bucket="short-videos" />
 
       {showForm && (
         <div style={{
