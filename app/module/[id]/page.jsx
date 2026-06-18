@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import QuizEngine from '@/components/QuizEngine'
+import confetti from 'canvas-confetti'
 
 function openMoji(hex) {
   return `https://raw.githubusercontent.com/hfg-gmuend/openmoji/master/color/svg/${hex}.svg`
@@ -33,6 +34,15 @@ export default function ModuleFlowPage() {
   const [battleChoice, setBattleChoice] = useState(null)
   const [saving, setSaving] = useState(false)
   const [steps, setSteps] = useState([])
+  const [xpBubbles, setXpBubbles] = useState([])
+
+  const triggerFloatingXp = (amount) => {
+    const id = Date.now() + Math.random()
+    setXpBubbles((prev) => [...prev, { id, amount }])
+    setTimeout(() => {
+      setXpBubbles((prev) => prev.filter((b) => b.id !== id))
+    }, 1200)
+  }
 
   useEffect(() => {
     loadData()
@@ -141,7 +151,10 @@ export default function ModuleFlowPage() {
     const step = currentStep
     if (step && (step.type === 'video' || step.type === 'knowledge')) {
       setSaving(true)
+      const isAlreadyDone = progress?.steps_completed?.includes(stepIdx)
       const completedSteps = [...new Set([...(progress?.steps_completed || []), stepIdx])]
+      const xpEarned = isAlreadyDone ? 0 : 5
+
       const payload = {
         user_id: profile.id,
         module_id: Number(id),
@@ -151,6 +164,23 @@ export default function ModuleFlowPage() {
       }
       await supabase.from('user_progress').upsert(payload, { onConflict: 'user_id,module_id' })
       setProgress((prev) => ({ ...(prev || {}), ...payload }))
+
+      if (xpEarned > 0 && profile) {
+        const newXp = (profile.xp || 0) + xpEarned
+        await supabase.from('users').update({ xp: newXp }).eq('id', profile.id)
+        setProfile((prev) => ({ ...prev, xp: newXp }))
+
+        const { checkAndUpgradeRank } = await import('@/lib/ranks')
+        const upgradedRank = await checkAndUpgradeRank(supabase, profile.id, newXp)
+        if (upgradedRank) {
+          setProfile((prev) => ({ ...prev, rank: upgradedRank }))
+        }
+
+        const { checkAndAwardBadges } = await import('@/lib/badges')
+        await checkAndAwardBadges(supabase, profile.id)
+
+        triggerFloatingXp(xpEarned)
+      }
       setSaving(false)
     }
 
@@ -162,13 +192,20 @@ export default function ModuleFlowPage() {
     setSaving(true)
 
     const completedSteps = [...(progress?.steps_completed || []), stepIdx]
+    
+    // Determine module completion
+    const isCompleted = (Math.max(earnedStars, update?.stars || 0) >= 3)
+    const wasAlreadyCompleted = progress?.completed || false
+    const newlyCompleted = isCompleted && !wasAlreadyCompleted
+
     const payload = {
       user_id: profile.id,
       module_id: Number(id),
       stars: Math.max(earnedStars, update?.stars || 0),
       steps_completed: [...new Set(completedSteps)],
-      quiz_scores: progress?.quiz_scores || [],
-      ...(update?.xp ? { completed: earnedStars + (update?.stars || 0) >= 3 } : {}),
+      quiz_scores: update?.quiz_scores || progress?.quiz_scores || [],
+      completed: isCompleted,
+      ...(newlyCompleted ? { completed_at: new Date().toISOString() } : {})
     }
 
     if (progress?.id) {
@@ -178,11 +215,37 @@ export default function ModuleFlowPage() {
       if (data) setProgress(data)
     }
 
+    let newXp = profile.xp || 0
+    let modulesCompletedVal = profile.modules_completed || 0
+
     if (update?.xp) {
-      const newXp = (profile.xp || 0) + update.xp
-      const completedCount = earnedStars + (update?.stars || 0) >= 3 ? (profile.modules_completed || 0) + 1 : profile.modules_completed
-      await supabase.from('users').update({ xp: newXp, modules_completed: completedCount }).eq('id', profile.id)
-      setProfile((prev) => ({ ...prev, xp: newXp, modules_completed: completedCount }))
+      newXp = (profile.xp || 0) + update.xp
+      triggerFloatingXp(update.xp)
+    }
+
+    if (newlyCompleted) {
+      modulesCompletedVal = modulesCompletedVal + 1
+    }
+
+    if (update?.xp || newlyCompleted) {
+      await supabase
+        .from('users')
+        .update({ 
+          xp: newXp, 
+          modules_completed: modulesCompletedVal 
+        })
+        .eq('id', profile.id)
+
+      setProfile((prev) => ({ ...prev, xp: newXp, modules_completed: modulesCompletedVal }))
+
+      const { checkAndUpgradeRank } = await import('@/lib/ranks')
+      const upgradedRank = await checkAndUpgradeRank(supabase, profile.id, newXp)
+      if (upgradedRank) {
+        setProfile((prev) => ({ ...prev, rank: upgradedRank }))
+      }
+
+      const { checkAndAwardBadges } = await import('@/lib/badges')
+      await checkAndAwardBadges(supabase, profile.id)
     }
 
     setProgress((prev) => ({ ...(prev || {}), ...payload }))
@@ -193,7 +256,19 @@ export default function ModuleFlowPage() {
     if (result.passed) {
       const newStars = Math.min(earnedStars + 1, 3)
       const xpEarned = (currentStep.star <= 2 ? 15 : 25) + (result.score === 100 ? 10 : 0)
-      await saveProgress({ stars: newStars, xp: xpEarned })
+      
+      const existingScores = progress?.quiz_scores || []
+      const quizId = currentStep.quiz.id
+      const matchIdx = existingScores.findIndex(q => q.quiz_id === quizId)
+      const newScoreObj = { quiz_id: quizId, score: result.score, passed: true }
+      let updatedScores = [...existingScores]
+      if (matchIdx >= 0) {
+        updatedScores[matchIdx] = { ...updatedScores[matchIdx], ...newScoreObj }
+      } else {
+        updatedScores.push(newScoreObj)
+      }
+
+      await saveProgress({ stars: newStars, xp: xpEarned, quiz_scores: updatedScores })
     }
   }
 
@@ -203,7 +278,12 @@ export default function ModuleFlowPage() {
   }
 
   const handleCompleteModule = async () => {
-    await saveProgress({ stars: 3, xp: 0 })
+    const passedQuizzes = quizzes.filter(q => {
+      const result = quizResults[q.id]
+      return result?.passed || progress?.quiz_scores?.some(s => s.quiz_id === q.id && s.passed)
+    }).length
+    const finalStars = Math.min(passedQuizzes, 3)
+    await saveProgress({ stars: finalStars, xp: 0 })
     goBack()
   }
 
@@ -294,6 +374,30 @@ export default function ModuleFlowPage() {
           <div style={savingCard}>Saving your progress...</div>
         </div>
       )}
+
+      {xpBubbles.map((b) => (
+        <div
+          key={b.id}
+          className="xp-bubble"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: '25%',
+            background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+            color: 'white',
+            fontWeight: 800,
+            fontSize: '18px',
+            padding: '8px 16px',
+            borderRadius: '20px',
+            boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
+            zIndex: 1000,
+            border: '2px solid white',
+            transform: 'translateX(-50%)',
+          }}
+        >
+          +{b.amount} XP ✨
+        </div>
+      ))}
     </div>
   )
 }
@@ -415,6 +519,16 @@ function BattleStep({ choice, onVote, onNext }) {
 }
 
 function CompleteStep({ mod, earnedStars, onFinish }) {
+  useEffect(() => {
+    if (earnedStars >= 3) {
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        origin: { y: 0.6 }
+      })
+    }
+  }, [earnedStars])
+
   return (
     <div style={stack16}>
       <div style={{ ...heroPanel, background: '#d9f99d', borderColor: '#84cc16' }}>
