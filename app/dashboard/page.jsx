@@ -384,10 +384,75 @@ export default function DashboardPage() {
 }
 
 // ─── PATH TAB (Duolingo-style glossy 3D steps) ──────────────────────
+function IconPlay({ size = 22 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="6 3 20 12 6 21 6 3" />
+    </svg>
+  )
+}
+function IconBook({ size = 22 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  )
+}
+function IconQuiz({ size = 22 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  )
+}
+function IconLock({ size = 22 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  )
+}
+function IconCheck({ size = 22 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
+function darken(hex, amount = 0.35) {
+  const r = parseInt(hex.slice(1,3), 16)
+  const g = parseInt(hex.slice(3,5), 16)
+  const b = parseInt(hex.slice(5,7), 16)
+  const f = 1 - amount
+  return `#${Math.floor(r*f).toString(16).padStart(2,'0')}${Math.floor(g*f).toString(16).padStart(2,'0')}${Math.floor(b*f).toString(16).padStart(2,'0')}`
+}
+
 function PathTab({ steps, modules, progress, onSelect, profile, unlockedMods }) {
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    setIsDesktop(mq.matches)
+    const handler = (e) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
   const nodeColors = ['#1CB0F6', '#FFC800', '#8B5CF6', '#FF4B82', '#00B894', '#FD79A8', '#6C5CE7', '#00CEC9']
 
-  // Group steps by module for labels
+  const SCALE = isDesktop ? 1.35 : 1
+  const ICON_SIZE = Math.round(22 * SCALE)
+  const NODE_R = Math.round(34 * SCALE)
+  const AMPLITUDE = Math.round(65 * SCALE)
+  const V_SPACING = Math.round(130 * SCALE)
+  const CENTER_X = Math.round(160 * SCALE)
+  const START_Y = 50
+  const STEP_MARGIN = isDesktop ? 36 : 30
+
   const moduleLabels = {}
   steps.forEach((s) => {
     if (!moduleLabels[s.mod.id]) moduleLabels[s.mod.id] = { mod: s.mod, count: 0, done: 0 }
@@ -395,166 +460,184 @@ function PathTab({ steps, modules, progress, onSelect, profile, unlockedMods }) 
     if (s.stars > 0) moduleLabels[s.mod.id].done++
   })
 
-  const stepIcons = { video: '📹', knowledge: '🧠', quiz: '📝' }
+  const iconMap = { video: <IconPlay size={ICON_SIZE} />, knowledge: <IconBook size={ICON_SIZE} />, quiz: <IconQuiz size={ICON_SIZE} /> }
   const stepLabels = { video: 'Watch', knowledge: 'Learn', quiz: 'Quiz' }
 
+  // Compute node positions using sine wave
+  const nodes = steps.map((s, i) => ({
+    x: CENTER_X + Math.sin(i * 0.9) * AMPLITUDE,
+    y: START_Y + i * V_SPACING,
+  }))
+
+  // First incomplete node is "active"
+  const activeIdx = steps.findIndex(s => !s.locked && s.stars < 3)
+
   return (
-    <div style={{ flex: 1, overflowY: 'auto', background: '#F0F4F8' }}>
-      {/* Duo-Style Header Pill Badges */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '12px 16px 8px',
-      }}>
-        <div style={pillStyle('#FF9600')}><span style={{fontSize:16}}>🔥</span> {profile?.streak || '0'}</div>
-        <div style={pillStyle('#1CB0F6')}><span style={{fontSize:16}}>💎</span> {profile?.xp?.toLocaleString() || '0'}</div>
-        <div style={pillStyle('#FF4B82')}><span style={{fontSize:16}}>⚡</span> 25</div>
-        <div style={{ flex: 1 }} />
+    <div style={{ flex: 1, overflowY: 'auto', background: '#0B0E2A', position: 'relative' }}>
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+        {Array.from({ length: 60 }).map((_, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            left: `${(i * 37 + 13) % 100}%`,
+            top: `${(i * 53 + 7) % 100}%`,
+            width: i % 5 === 0 ? 3 : 1.5,
+            height: i % 5 === 0 ? 3 : 1.5,
+            borderRadius: '50%',
+            background: i % 7 === 0 ? '#FFD700' : i % 3 === 0 ? '#A29BFE' : '#FFFFFF',
+            opacity: 0.4 + (i % 4) * 0.15,
+            boxShadow: i % 5 === 0 ? '0 0 6px rgba(255,255,255,0.4)' : 'none',
+          }} />
+        ))}
+        {[1, 2, 3].map((n) => (
+          <div key={`g${n}`} style={{
+            position: 'absolute', right: `${5 + n * 20}%`, top: `${15 + n * 25}%`,
+            width: `${40 + n * 20}px`, height: `${40 + n * 20}px`,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(162,155,254,0.08) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }} />
+        ))}
+        {[1, 2].map((n) => (
+          <div key={`s${n}`} style={{
+            position: 'absolute', left: `${5 + n * 30}%`, bottom: `${10 + n * 20}%`,
+            width: '120px', height: '60px',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(255,200,0,0.05) 0%, transparent 70%)',
+            transform: 'rotate(-20deg)',
+            pointerEvents: 'none',
+          }} />
+        ))}
       </div>
 
-      {/* Unit Banner */}
-      <div style={{
-        background: 'linear-gradient(180deg,#8B5CF6 0%,#6D3FD9 100%)',
-        margin: '0 14px 8px', borderRadius: 16, padding: '14px 18px',
-        color: 'white', display: 'flex', justifyContent: 'space-between',
-        alignItems: 'center', boxShadow: '0 4px 0 rgba(0,0,0,0.12)',
-      }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.85, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-            {profile?.rank || 'Science Cadet'}
-          </div>
-          <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2 }}>
-            🎖️ {profile?.username || 'Explorer'}
-          </div>
-        </div>
+      <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'rgba(255,255,255,0.18)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '12px 16px 8px',
         }}>
-          ☰
+          <div style={pillStyle('#FF9600')}><span style={{fontSize:16}}>🔥</span> {profile?.streak || '0'}</div>
+          <div style={pillStyle('#1CB0F6')}><span style={{fontSize:16}}>💎</span> {profile?.xp?.toLocaleString() || '0'}</div>
+          <div style={pillStyle('#FF4B82')}><span style={{fontSize:16}}>⚡</span> 25</div>
+          <div style={{ flex: 1 }} />
         </div>
-      </div>
 
-      {/* Glossy Path */}
-      <div style={{ position: 'relative', padding: '20px 0 60px' }}>
-        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
-          <path
-            d={steps.map((s, i) => {
-              const cx = 195 + (i % 2 === 0 ? -78 : 78)
-              const cy = i * 96 + 72
-              return i === 0 ? `M${cx},${cy}` : `Q${195},${cy - 48} ${cx},${cy}`
-            }).join(' ')}
-            fill="none" stroke="#E0E5EC" strokeWidth="8" strokeLinecap="round"
-          />
-        </svg>
-
-        {steps.map((step, i) => {
-          const prevModId = i > 0 ? steps[i - 1].mod.id : null
-          const showModuleLabel = i === 0 || step.mod.id !== prevModId
-          const locked = step.locked && !step.modProgress
-          const colorIdx = i % nodeColors.length
-          const fill = locked ? '#E5E5E5' : nodeColors[colorIdx]
-          const shadowColor = locked ? '#C8C8C8' : nodeColors[(colorIdx + 1) % nodeColors.length]
-          const offset = i % 2 === 0 ? -78 : 78
-          const icon = locked ? '🔒' : step.stars >= 3 ? '✅' : stepIcons[step.type] || '📹'
-
-          return (
-            <div key={`${step.mod.id}-${i}`}>
-              {/* Module category label */}
-              {showModuleLabel && (
-                <div style={{
-                  display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6,
-                  margin: '8px 0 4px', transform: 'translateX(0px)',
-                }}>
-                  <span style={{ fontSize: 18 }}>{step.mod.emoji}</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#3C3C3C' }}>{step.mod.title}</span>
-                </div>
-              )}
-              {/* Node */}
-              <div style={{
-                display: 'flex', justifyContent: 'center',
-                transform: `translateX(${offset}px)`,
-                position: 'relative', zIndex: 1, margin: '2px 0',
-              }}>
-                <button
-                  onClick={() => !locked && onSelect(step.mod)}
-                  disabled={locked}
-                  style={{
-                    width: 68, height: 68,
-                    borderRadius: '50%', border: 'none', cursor: locked ? 'not-allowed' : 'pointer',
-                    position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: fill,
-                    boxShadow: `0 7px 0 ${shadowColor}`,
-                    transition: 'transform 0.15s',
-                  }}
-                >
-                  <div style={{
-                    position: 'absolute', top: 7, left: 12,
-                    width: 32, height: 16,
-                    borderRadius: '50%',
-                    background: locked ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.35)',
-                    pointerEvents: 'none',
-                  }} />
-                  <span style={{
-                    position: 'relative', zIndex: 2,
-                    fontSize: 26,
-                    opacity: locked ? 0.45 : 1,
-                    filter: locked ? 'grayscale(1)' : 'none',
-                  }}>
-                    {icon}
-                  </span>
-                </button>
-              </div>
-              {/* Label */}
-              <div style={{
-                textAlign: 'center', fontSize: 10, fontWeight: 700, color: locked ? '#B0B0B0' : '#3C3C3C',
-                marginTop: 1, transform: `translateX(${offset}px)`,
-                maxWidth: 110, marginLeft: 'auto', marginRight: 'auto',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {stepLabels[step.type]} {step.lesson?.title || ''}
-              </div>
+        <div style={{
+          background: 'linear-gradient(180deg,#1a1040 0%,#2d1b69 100%)',
+          margin: '0 14px 8px', borderRadius: 16, padding: '14px 18px',
+          color: 'white', display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
+        }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.85, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+              {profile?.rank || 'Science Cadet'}
             </div>
-          )
-        })}
-
-        {/* Companion Planet */}
-        <div style={{
-          position: 'absolute', left: 22, top: Math.min(steps.length * 96 / 2, 220),
-          display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2,
-        }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: '50%',
-            background: 'radial-gradient(circle at 30% 28%, #B98CFF 0%, #8B5CF6 55%, #6D3FD9 100%)',
-            boxShadow: '0 6px 0 #5A32B3', position: 'relative',
-          }}>
-            <div style={{
-              position: 'absolute', top: '50%', left: -8,
-              width: 72, height: 16, border: '3.5px solid #D9B8FF',
-              borderRadius: '50%',
-              transform: 'translateY(-50%) rotate(-10deg)',
-              opacity: 0.85, pointerEvents: 'none',
-            }} />
+            <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2 }}>
+              🚀 {profile?.username || 'Explorer'}
+            </div>
           </div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#777', marginTop: 4 }}>Nova</div>
-        </div>
-
-        {/* Discovery Chest */}
-        <div style={{
-          display: 'flex', justifyContent: 'center', margin: '4px 0',
-          transform: 'translateX(78px)',
-        }}>
           <div style={{
-            width: 52, height: 52, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 28,
+            width: 36, height: 36, borderRadius: 10,
+            background: 'rgba(255,255,255,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, cursor: 'pointer',
           }}>
-            🏆
+            ☰
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', padding: '8px 0 24px', color: '#aaa', fontSize: 12, fontWeight: 600 }}>
-          🔒 Keep exploring to unlock more!
+        <div style={{
+          position: 'relative', padding: '20px 0 60px',
+          maxWidth: isDesktop ? 700 : 420, margin: '0 auto',
+        }}>
+
+          {steps.map((step, i) => {
+            const prevModId = i > 0 ? steps[i - 1].mod.id : null
+            const showModuleLabel = i === 0 || step.mod.id !== prevModId
+            const locked = step.locked && !step.modProgress
+            const colorIdx = i % nodeColors.length
+            const nodeColor = nodeColors[colorIdx]
+            const fill = locked ? '#2A2A4A' : nodeColor
+            const shadow = locked ? '#1A1A3A' : darken(nodeColor)
+            const isActive = i === activeIdx && !locked && step.stars < 3
+            const icon = locked ? <IconLock size={ICON_SIZE} /> : step.stars >= 3 ? <IconCheck size={ICON_SIZE} /> : iconMap[step.type] || <IconPlay size={ICON_SIZE} />
+            const pos = nodes[i]
+            const offsetPx = pos.x - CENTER_X
+
+            return (
+              <div key={`${step.mod.id}-${i}`}>
+                {showModuleLabel && (
+                  <div style={{
+                    display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6,
+                    margin: '6px 0 2px',
+                  }}>
+                    <span style={{
+                      fontSize: isDesktop ? 20 : 16, background: 'rgba(255,255,255,0.06)',
+                      borderRadius: 10, padding: '3px 10px',
+                    }}>
+                      <span style={{ marginRight: 4 }}>{step.mod.emoji}</span>
+                      <span style={{ fontSize: isDesktop ? 15 : 12, fontWeight: 800, color: '#C8C8E6' }}>{step.mod.title}</span>
+                    </span>
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex', justifyContent: 'center', alignItems: 'center',
+                  paddingLeft: offsetPx > 0 ? `${offsetPx}px` : '0',
+                  paddingRight: offsetPx < 0 ? `${-offsetPx}px` : '0',
+                  position: 'relative', zIndex: 1, margin: `${STEP_MARGIN}px 0`,
+                }}>
+                  <button
+                    onClick={() => !locked && onSelect(step.mod)}
+                    disabled={locked}
+                    style={{
+                      width: NODE_R * 2, height: NODE_R * 2,
+                      borderRadius: '50%', border: isActive ? `3px solid ${nodeColor}` : 'none',
+                      cursor: locked ? 'not-allowed' : 'pointer',
+                      position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: fill,
+                      boxShadow: isActive
+                        ? `0 6px 0 ${shadow}, 0 0 0 4px ${nodeColor}33, 0 0 24px ${nodeColor}66`
+                        : `0 6px 0 ${shadow}`,
+                      transition: 'transform 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute', top: Math.round(6 * SCALE), left: Math.round(10 * SCALE),
+                      width: Math.round(28 * SCALE), height: Math.round(14 * SCALE), borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.3)',
+                      pointerEvents: 'none',
+                    }} />
+                    <span style={{
+                      position: 'relative', zIndex: 2,
+                      opacity: locked ? 0.4 : 1,
+                      filter: locked ? 'grayscale(1)' : 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {icon}
+                    </span>
+                  </button>
+                </div>
+                <div style={{
+                  display: 'flex', justifyContent: 'center',
+                  paddingLeft: offsetPx > 0 ? `${offsetPx}px` : '0',
+                  paddingRight: offsetPx < 0 ? `${-offsetPx}px` : '0',
+                  marginTop: -2,
+                }}>
+                  <div style={{
+                    fontSize: isDesktop ? 13 : 10, fontWeight: 700, color: locked ? '#555' : '#C8C8E6',
+                    maxWidth: isDesktop ? 160 : 120, textAlign: 'center',
+                    overflow: 'hidden', lineHeight: 1.3,
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    wordBreak: 'break-word',
+                  }}>
+                    {stepLabels[step.type]} {step.lesson?.title || ''}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
+          <div style={{ textAlign: 'center', padding: '8px 0 24px', color: '#555', fontSize: 12, fontWeight: 600 }}>
+            🚀 Keep exploring the universe!
+          </div>
         </div>
       </div>
     </div>
