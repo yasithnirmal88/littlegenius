@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { AVATAR_OPTIONS, avatarFromId, avatarFromSeed } from '@/lib/avatar-options'
 
 const RANKS = [
   'Science Cadet',
@@ -27,8 +28,8 @@ const TAB_ITEMS = [
   { id: 'me', label: 'Me', icon: '1F9D1' },
 ]
 
-const HOME_AVATAR_SEEDS = ['Alek', 'Liam', 'Nova', 'Maya', 'Ivy', 'Kai']
-const FRIEND_SEEDS = ['Alek', 'Liam', 'Ava', 'Nia']
+const HOME_AVATAR_IDS = ['alex', 'cindy', 'max', 'clover', 'jade', 'yumiko']
+const FRIEND_IDS = ['alex', 'boa', 'mark', 'william']
 
 const ACHIEVEMENTS = [
   { id: 'rocket', label: 'Rocket', icon: '1F680' },
@@ -37,9 +38,6 @@ const ACHIEVEMENTS = [
   { id: 'planet', label: 'Planet', icon: '1F30D' },
 ]
 
-function dicebear(seed, background = 'b6e3f4') {
-  return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=${background}`
-}
 
 function openMoji(hex) {
   return `https://raw.githubusercontent.com/hfg-gmuend/openmoji/master/color/svg/${hex}.svg`
@@ -47,6 +45,11 @@ function openMoji(hex) {
 
 function getProfileSeed(profile) {
   return profile?.username || profile?.email || 'Little Genius'
+}
+
+function getProfileAvatar(profile) {
+  if (profile?.avatar_url) return avatarFromId(profile.avatar_url)
+  return avatarFromSeed(getProfileSeed(profile))
 }
 
 function getUnlockedModule(modules, progress, unlockedMods) {
@@ -330,6 +333,8 @@ export default function DashboardPage() {
 }
 
 function HeaderBar({ profile, title, avatarSeed }) {
+  const avatar = getProfileAvatar(profile)
+
   return (
     <div style={headerBar}>
       <div style={brandStack}>
@@ -343,14 +348,14 @@ function HeaderBar({ profile, title, avatarSeed }) {
       <div style={headerChips}>
         <StatPill icon="2B50" value={profile?.xp?.toLocaleString() || '0'} />
         <StatPill icon="1F525" value={profile?.streak || '0'} />
-        <img src={dicebear(avatarSeed, 'c0aede')} alt="" width="42" height="42" style={avatarBubble} />
+        <img src={avatar.src} alt={avatar.label} width="42" height="42" style={avatarBubble} />
       </div>
     </div>
   )
 }
 
 function HomeTab({ profile, featuredShorts, dailyChallenge, dailyAnswered, onDailyAnswer, onPickShort, onPlay, watchHistory }) {
-  const selectedAvatar = getProfileSeed(profile)
+  const selectedAvatar = getProfileAvatar(profile)
 
   return (
     <div style={tabStack}>
@@ -361,12 +366,13 @@ function HomeTab({ profile, featuredShorts, dailyChallenge, dailyAnswered, onDai
           <div style={heroSubtitle}>Pick an avatar and start your next science mission.</div>
 
           <div style={avatarGrid}>
-            {HOME_AVATAR_SEEDS.map((seed) => {
-              const active = selectedAvatar.toLowerCase().includes(seed.toLowerCase())
+            {HOME_AVATAR_IDS.map((avatarId) => {
+              const avatar = avatarFromId(avatarId)
+              const active = selectedAvatar.id === avatar.id
               return (
-                <div key={seed} style={{ ...avatarChoice, borderColor: active ? '#2563eb' : '#ffffff' }}>
-                  <img src={dicebear(seed, 'ffd5dc')} alt={seed} width="84" height="84" style={avatarChoiceImage} />
-                  <div style={avatarLabel}>{seed}</div>
+                <div key={avatar.id} style={{ ...avatarChoice, borderColor: active ? '#2563eb' : '#ffffff' }}>
+                  <img src={avatar.src} alt={avatar.label} width="84" height="84" style={avatarChoiceImage} />
+                  <div style={avatarLabel}>{avatar.label}</div>
                 </div>
               )
             })}
@@ -556,18 +562,22 @@ function ProgressTab({ profile, completedModules, modules, battle, battleChoice,
 
 function RanksTab({ profile }) {
   const currentIndex = rankIndex(profile?.rank)
+  const activeAvatar = getProfileAvatar(profile)
 
   return (
     <div style={tabStack}>
       <SectionTitle icon="1F451" label="Ranks Ladder" />
 
       <div style={friendsRow}>
-        {FRIEND_SEEDS.map((seed) => (
-          <div key={seed} style={friendBubble}>
-            <img src={dicebear(seed, 'ffd966')} alt={seed} width="62" height="62" style={friendAvatar} />
-            <span style={friendName}>{seed}</span>
-          </div>
-        ))}
+        {FRIEND_IDS.map((avatarId) => {
+          const avatar = avatarFromId(avatarId)
+          return (
+            <div key={avatar.id} style={friendBubble}>
+              <img src={avatar.src} alt={avatar.label} width="62" height="62" style={friendAvatar} />
+              <span style={friendName}>{avatar.label}</span>
+            </div>
+          )
+        })}
       </div>
 
       <div style={ladderStack}>
@@ -583,7 +593,7 @@ function RanksTab({ profile }) {
                 <div style={ladderRankName}>{rank}</div>
               </div>
               {isCurrent && (
-                <img src={dicebear(getProfileSeed(profile), 'c4b5fd')} alt="" width="72" height="72" style={ladderAvatar} />
+                <img src={activeAvatar.src} alt={activeAvatar.label} width="72" height="72" style={ladderAvatar} />
               )}
             </div>
           )
@@ -629,13 +639,13 @@ function DailyChallenge({ challenge, answered, onAnswer }) {
 }
 
 function ProfileTab({ profile, onLogout, onUpdateAvatar }) {
-  const avatarSeeds = ['Alek', 'Liam', 'Nova', 'Maya', 'Ivy', 'Kai', 'Zara', 'Sage', 'River', 'Fox']
-  const selectedSeed = getProfileSeed(profile)
+  const avatar = getProfileAvatar(profile)
+  const selectedAvatarId = profile?.avatar_url || avatar.id
 
-  const updateAvatar = async (seed) => {
-    const { error } = await createClient().from('users').update({ avatar_url: seed }).eq('id', profile.id)
+  const updateAvatar = async (avatarId) => {
+    const { error } = await createClient().from('users').update({ avatar_url: avatarId }).eq('id', profile.id)
     if (!error && onUpdateAvatar) {
-      onUpdateAvatar(seed)
+      onUpdateAvatar(avatarId)
     }
   }
 
@@ -643,7 +653,7 @@ function ProfileTab({ profile, onLogout, onUpdateAvatar }) {
     <div style={tabStack}>
       <Panel color="#8ec5ff" border="#6197d8">
         <div style={{ ...stack16, alignItems: 'center', textAlign: 'center' }}>
-          <img src={dicebear(getProfileSeed(profile), 'fecdd3')} alt="" width="110" height="110" style={profileAvatar} />
+          <img src={avatar.src} alt={avatar.label} width="110" height="110" style={profileAvatar} />
           <div style={profileName}>{profile?.username || 'Science Cadet'}</div>
           <div style={profileRank}>{profile?.rank || 'Science Cadet'}</div>
 
@@ -657,20 +667,20 @@ function ProfileTab({ profile, onLogout, onUpdateAvatar }) {
 
       <SectionTitle icon="1F9E0" label="Choose Your Avatar" />
       <div style={avatarPickerGrid}>
-        {avatarSeeds.map((seed) => {
-          const isSelected = selectedSeed.toLowerCase().includes(seed.toLowerCase())
+        {AVATAR_OPTIONS.map((avatarOption) => {
+          const isSelected = selectedAvatarId === avatarOption.id
           return (
             <button
-              key={seed}
-              onClick={() => updateAvatar(seed)}
+              key={avatarOption.id}
+              onClick={() => updateAvatar(avatarOption.id)}
               style={{
                 ...avatarPickerItem,
                 borderColor: isSelected ? '#8b5cf6' : '#e5e7eb',
                 borderWidth: isSelected ? '3px' : '1px',
               }}
             >
-              <img src={dicebear(seed, 'ffd5dc')} alt={seed} width="72" height="72" />
-              <div style={{ fontSize: 10, fontWeight: 500, marginTop: 4 }}>{seed}</div>
+              <img src={avatarOption.src} alt={avatarOption.label} width="72" height="72" style={{ borderRadius: 16 }} />
+              <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>{avatarOption.label}</div>
             </button>
           )
         })}

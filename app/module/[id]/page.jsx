@@ -5,14 +5,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import QuizEngine from '@/components/QuizEngine'
+import { avatarFromSeed } from '@/lib/avatar-options'
 
 function openMoji(hex) {
   return `https://raw.githubusercontent.com/hfg-gmuend/openmoji/master/color/svg/${hex}.svg`
 }
 
-function dicebear(seed, background = 'c4b5fd') {
-  return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=${background}`
-}
 
 function getProfileSeed(profile) {
   return profile?.username || profile?.email || 'Little Genius'
@@ -133,6 +131,7 @@ export default function ModuleFlowPage() {
 
   const currentStep = steps[stepIdx] || null
   const earnedStars = progress?.stars || 0
+  const profileAvatar = avatarFromSeed(getProfileSeed(profile))
 
   const goBack = () => {
     router.push('/dashboard')
@@ -249,7 +248,7 @@ export default function ModuleFlowPage() {
             <div style={headerPills}>
               <HeaderPill icon="2B50" value={profile?.xp?.toLocaleString() || '0'} />
               <HeaderPill icon="1F525" value={profile?.streak || '0'} />
-              <img src={dicebear(getProfileSeed(profile))} alt="" width="42" height="42" style={profileThumb} />
+              <img src={profileAvatar.src} alt={profileAvatar.label} width="42" height="42" style={profileThumb} />
             </div>
           </div>
 

@@ -4,14 +4,12 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Input } from '@/components/ui/Input'
+import { AVATAR_OPTIONS } from '@/lib/avatar-options'
 
 function openMoji(hex) {
   return `https://raw.githubusercontent.com/hfg-gmuend/openmoji/master/color/svg/${hex}.svg`
 }
 
-function dicebear(seed, background = 'ffd5dc') {
-  return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=${background}`
-}
 
 export default function LoginPage() {
   const supabase = createClient()
@@ -112,8 +110,8 @@ export default function LoginPage() {
         <div style={contentShell}>
           <div style={welcomeCard}>
             <div style={avatarRow}>
-              {['Alek', 'Nova', 'Liam'].map((seed) => (
-                <img key={seed} src={dicebear(seed)} alt={seed} width="70" height="70" style={avatarBubble} />
+              {AVATAR_OPTIONS.slice(0, 3).map((avatar) => (
+                <img key={avatar.id} src={avatar.src} alt={avatar.label} width="70" height="70" style={avatarBubble} />
               ))}
             </div>
             <div style={welcomeTitle}>Welcome!</div>

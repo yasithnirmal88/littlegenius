@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { AVATAR_OPTIONS } from '@/lib/avatar-options'
 
 const scienceDomains = [
   'Space',
@@ -65,9 +66,6 @@ function openMoji(hex) {
   return `https://raw.githubusercontent.com/hfg-gmuend/openmoji/master/color/svg/${hex}.svg`
 }
 
-function dicebear(seed, background = 'ffd5dc') {
-  return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=${background}`
-}
 
 export default async function Home() {
   const supabase = await createServerSupabaseClient()
@@ -143,10 +141,10 @@ export default async function Home() {
               <p style={previewText}>Pick an avatar and begin your next science adventure.</p>
 
               <div style={avatarGrid}>
-                {['Alek', 'Liam', 'Nova', 'Maya'].map((seed) => (
-                  <div key={seed} style={avatarCard}>
-                    <img src={dicebear(seed)} alt={seed} width="72" height="72" style={avatarImage} />
-                    <span style={avatarName}>{seed}</span>
+                {AVATAR_OPTIONS.slice(0, 4).map((avatar) => (
+                  <div key={avatar.id} style={avatarCard}>
+                    <img src={avatar.src} alt={avatar.label} width="72" height="72" style={avatarImage} />
+                    <span style={avatarName}>{avatar.label}</span>
                   </div>
                 ))}
               </div>
