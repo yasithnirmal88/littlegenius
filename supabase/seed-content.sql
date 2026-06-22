@@ -118,7 +118,7 @@ BEGIN
     INSERT INTO public.lessons (module_id, step_number, title, video_url, knowledge_text)
     VALUES
       (mod_id, 1, 'Mammals & Birds',
-       'https://www.youtube.com/watch?v=TP1T9GDzWFk',
+       'https://youtu.be/LGxmZqQBOdU',
        'Animals are amazing! Let''s learn about two big groups: mammals and birds.
 
 MAMMALS:
