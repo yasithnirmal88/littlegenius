@@ -91,6 +91,15 @@ export default function DashboardPage() {
   const [selectedModule, setSelectedModule] = useState(null)
   const [selectedShort, setSelectedShort] = useState(null)
   const [battleChoice, setBattleChoice] = useState(null)
+  const [xpBubbles, setXpBubbles] = useState([])
+
+  const triggerFloatingXp = (amount) => {
+    const id = Date.now() + Math.random()
+    setXpBubbles((prev) => [...prev, { id, amount }])
+    setTimeout(() => {
+      setXpBubbles((prev) => prev.filter((b) => b.id !== id))
+    }, 1200)
+  }
 
   useEffect(() => {
     loadData()
@@ -108,6 +117,60 @@ export default function DashboardPage() {
 
     const { data: prof } = await supabase.from('users').select('*').eq('auth_id', authUser.id).single()
     setProfile(prof)
+
+    // Streak Tracking: on dashboard load, check daily_logs for today, insert if missing, increment users.streak
+    if (prof) {
+      try {
+        const todayStr = new Date().toLocaleDateString('en-CA')
+        const { data: logToday, error: logErr } = await supabase
+          .from('daily_logs')
+          .select('*')
+          .eq('user_id', prof.id)
+          .eq('activity_date', todayStr)
+          .maybeSingle()
+
+        if (logErr) {
+          console.warn('daily_logs table may not exist yet or RLS error:', logErr)
+        } else if (!logToday) {
+          // Log is missing for today. Let's check yesterday to see if we should increment or reset streak.
+          const yesterday = new Date()
+          yesterday.setDate(yesterday.getDate() - 1)
+          const yesterdayStr = yesterday.toLocaleDateString('en-CA')
+
+          const { data: logYesterday } = await supabase
+            .from('daily_logs')
+            .select('*')
+            .eq('user_id', prof.id)
+            .eq('activity_date', yesterdayStr)
+            .maybeSingle()
+
+          let newStreak = 1
+          if (logYesterday) {
+            newStreak = (prof.streak || 0) + 1
+          }
+
+          // Insert daily log for today
+          await supabase
+            .from('daily_logs')
+            .insert({ user_id: prof.id, activity_date: todayStr })
+
+          // Update streak in users
+          await supabase
+            .from('users')
+            .update({ streak: newStreak })
+            .eq('id', prof.id)
+
+          prof.streak = newStreak
+          setProfile({ ...prof, streak: newStreak })
+
+          // Check/Award badges for streak
+          const { checkAndAwardBadges } = await import('@/lib/badges')
+          await checkAndAwardBadges(supabase, prof.id)
+        }
+      } catch (err) {
+        console.error('Error tracking streak:', err)
+      }
+    }
 
     const { data: mods } = await supabase.from('modules').select('*').eq('status', 'published').order('sort_order', { ascending: true })
     const { data: ls } = await supabase.from('lessons').select('*').order('step_number')
@@ -232,7 +295,71 @@ export default function DashboardPage() {
         />
       )}
 
-      {selectedShort && <ShortPlayer short={selectedShort} onClose={() => setSelectedShort(null)} />}
+      {selectedShort && (
+        <ShortPlayer
+          short={selectedShort}
+          onClose={() => setSelectedShort(null)}
+          onComplete={async () => {
+            if (!profile) return
+            try {
+              // Check if already watched to avoid double XP exploit
+              const watchedList = JSON.parse(localStorage.getItem('shorts_watched') || '[]')
+              if (!watchedList.includes(selectedShort.id)) {
+                watchedList.push(selectedShort.id)
+                localStorage.setItem('shorts_watched', JSON.stringify(watchedList))
+
+                const newXp = (profile.xp || 0) + 10
+                await supabase
+                  .from('users')
+                  .update({ xp: newXp })
+                  .eq('id', profile.id)
+
+                setProfile((p) => ({ ...p, xp: newXp }))
+
+                // Check badges & rank upgrades
+                const { checkAndAwardBadges } = await import('@/lib/badges')
+                const { checkAndUpgradeRank } = await import('@/lib/ranks')
+                await checkAndAwardBadges(supabase, profile.id, { shorts_watched: watchedList.length })
+                
+                const upgradedRank = await checkAndUpgradeRank(supabase, profile.id, newXp)
+                if (upgradedRank) {
+                  setProfile((p) => ({ ...p, rank: upgradedRank }))
+                }
+
+                // Trigger floating XP animation
+                triggerFloatingXp(10)
+              }
+            } catch (err) {
+              console.error('Error completing short:', err)
+            }
+            setSelectedShort(null)
+          }}
+        />
+      )}
+
+      {xpBubbles.map((b) => (
+        <div
+          key={b.id}
+          className="xp-bubble"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: '25%',
+            background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+            color: 'white',
+            fontWeight: 800,
+            fontSize: '18px',
+            padding: '8px 16px',
+            borderRadius: '20px',
+            boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
+            zIndex: 1000,
+            border: '2px solid white',
+            transform: 'translateX(-50%)',
+          }}
+        >
+          +{b.amount} XP ✨
+        </div>
+      ))}
     </div>
   )
 }
@@ -579,13 +706,18 @@ function ModuleSheet({ mod, stars, lessonCount, quizCount, onClose, onStart }) {
   )
 }
 
-function ShortPlayer({ short, onClose }) {
+function ShortPlayer({ short, onClose, onComplete }) {
   const isYouTube = short.video_url?.includes('youtube.com') || short.video_url?.includes('youtu.be')
   let embedUrl = null
 
   if (isYouTube) {
     const match = short.video_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
-    if (match) embedUrl = `https://www.youtube.com/embed/${match[1]}`
+    if (match) embedUrl = `https://www.youtube.com/embed/${match[1]}?enablejsapi=1`
+  }
+
+  const handleFinish = () => {
+    if (onComplete) onComplete()
+    else onClose()
   }
 
   return (
@@ -602,6 +734,7 @@ function ShortPlayer({ short, onClose }) {
         {embedUrl ? (
           <div style={videoFrameShell}>
             <iframe
+              id="ytplayer"
               src={embedUrl}
               style={videoFrame}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -609,13 +742,38 @@ function ShortPlayer({ short, onClose }) {
             />
           </div>
         ) : short.video_url ? (
-          <video controls style={videoPlayer} src={short.video_url} />
+          <video 
+            controls 
+            autoPlay
+            onEnded={handleFinish}
+            style={videoPlayer} 
+            src={short.video_url} 
+          />
         ) : (
           <div style={emptyVideoState}>
             <img src={openMoji('1F4F9')} alt="" width="56" height="56" />
             <div>Video not available yet.</div>
           </div>
         )}
+
+        <button 
+          onClick={handleFinish} 
+          style={{
+            marginTop: 14,
+            width: '100%',
+            border: '3px solid #047857',
+            background: '#10b981',
+            color: '#fff',
+            borderRadius: 20,
+            padding: '12px 16px',
+            fontSize: 16,
+            fontWeight: 900,
+            cursor: 'pointer',
+            boxShadow: '0 8px 0 rgba(4, 120, 87, 0.15)',
+          }}
+        >
+          ✓ Done Watching! (+10 XP)
+        </button>
       </div>
     </div>
   )
