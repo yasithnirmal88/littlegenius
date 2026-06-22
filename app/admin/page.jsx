@@ -914,8 +914,13 @@ function AdminQuizzes({ supabase, quizzes, setQuizzes, modules }) {
     setQuizzes((qs) => qs.filter((q) => q.id !== id))
   }
 
-  const openNewQuestion = (quizId) => {
-    setQuestionForm({ quiz_id: quizId, question_text: '', options: ['', '', '', ''], correct_index: 0, sort_order: 0 })
+const openNewQuestion = (quizId) => {
+    setQuestionForm({ id: null, quiz_id: quizId, question_text: '', options: ['', '', '', ''], correct_index: 0, sort_order: 0 })
+    setShowQuestionForm(true)
+  }
+
+  const openEditQuestion = (qq, quizId) => {
+    setQuestionForm({ ...qq, quiz_id: quizId })
     setShowQuestionForm(true)
   }
 
@@ -928,9 +933,17 @@ function AdminQuizzes({ supabase, quizzes, setQuizzes, modules }) {
       correct_index: Number(questionForm.correct_index),
       sort_order: questionForm.sort_order || 0,
     }
-    const { data } = await supabase.from('quiz_questions').insert(payload).select().single()
-    if (data) {
-      setQuizzes((qs) => qs.map((q) => (q.id === data.quiz_id ? { ...q, quiz_questions: [...(q.quiz_questions || []), data] } : q)))
+    
+    if (questionForm.id) {
+      // If it has an ID, update the existing question
+      await supabase.from('quiz_questions').update(payload).eq('id', questionForm.id)
+      setQuizzes((qs) => qs.map((q) => (q.id === questionForm.quiz_id ? { ...q, quiz_questions: (q.quiz_questions || []).map((qq) => qq.id === questionForm.id ? { ...qq, ...payload } : qq) } : q)))
+    } else {
+      // Otherwise, insert a new one
+      const { data } = await supabase.from('quiz_questions').insert(payload).select().single()
+      if (data) {
+        setQuizzes((qs) => qs.map((q) => (q.id === data.quiz_id ? { ...q, quiz_questions: [...(q.quiz_questions || []), data] } : q)))
+      }
     }
     setShowQuestionForm(false)
   }
@@ -991,8 +1004,8 @@ const delQuestion = async (questionId, quizId) => {
           padding: 'clamp(12px, 2vw, 20px)',
           display: 'flex', flexDirection: 'column', gap: 'clamp(8px, 1.5vw, 12px)',
         }}>
-          <div style={{ fontWeight: 700, color: '#00b894', fontSize: 'clamp(13px, 2vw, 15px)' }}>
-            New Question
+         <div style={{ fontWeight: 700, color: '#00b894', fontSize: 'clamp(13px, 2vw, 15px)' }}>
+            {questionForm.id ? 'Edit Question' : 'New Question'}
           </div>
           <Input value={questionForm.question_text || ''} onChange={(v) => setQuestionForm((f) => ({ ...f, question_text: v }))} placeholder="Question text" />
           {[0, 1, 2, 3].map((i) => (
@@ -1018,7 +1031,7 @@ const delQuestion = async (questionId, quizId) => {
             Select the radio button next to the correct answer.
           </div>
           <div style={{ display: 'flex', gap: 'clamp(6px, 1vw, 10px)' }}>
-            <Btn onClick={saveQuestion} color="#00b894">Add Question</Btn>
+            <Btn onClick={saveQuestion} color="#00b894">{questionForm.id ? 'Save Changes' : 'Add Question'}</Btn>
             <Btn onClick={() => setShowQuestionForm(false)} color="#aaa" outline>Cancel</Btn>
           </div>
         </div>
@@ -1085,10 +1098,15 @@ const delQuestion = async (questionId, quizId) => {
                     <div style={{ flex: 1, fontSize: 'clamp(12px, 1.5vw, 13px)', color: '#2d3436' }}>
                       {qq.question_text}
                     </div>
-                    <Badge color="#00b894">✓ {(qq.options || [])[qq.correct_index]}</Badge>
-                    <button onClick={() => delQuestion(qq.id, q.id)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 14, color: '#ff7675' }}
-                    >✕</button>
+                 <Badge color="#00b894">✓ {(qq.options || [])[qq.correct_index]}</Badge>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={() => openEditQuestion(qq, q.id)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 14, color: '#667eea' }}
+                      >✏️</button>
+                      <button onClick={() => delQuestion(qq.id, q.id)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 14, color: '#ff7675' }}
+                      >✕</button>
+                    </div>
                   </div>
                 ))}
                 {qCount === 0 && (
