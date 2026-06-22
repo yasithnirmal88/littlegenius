@@ -539,7 +539,18 @@ const del = async (id) => {
             <Input value={form.step_number || ''} onChange={(v) => setForm((f) => ({ ...f, step_number: Number(v) }))} placeholder="Step #" type="number" style={{ width: 'clamp(70px, 12vw, 100px)' }} />
           </div>
           <Input value={form.title || ''} onChange={(v) => setForm((f) => ({ ...f, title: v }))} placeholder="Lesson title" />
-          <Input value={form.video_url || ''} onChange={(v) => setForm((f) => ({ ...f, video_url: v }))} placeholder="Video URL (YouTube link)" />
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <Input 
+              value={form.video_url || ''} 
+              onChange={(v) => setForm((f) => ({ ...f, video_url: v }))} 
+              placeholder="Video URL (Upload or paste link)" 
+              style={{ flex: 1, minWidth: '200px' }} 
+            />
+            <VideoUploadBtn 
+              bucket="lesson-videos" 
+              onUploaded={(url) => setForm((f) => ({ ...f, video_url: url }))} 
+            />
+          </div>
           
           
           <div style={{ width: '100%' }}>
@@ -656,8 +667,7 @@ const del = async (id) => {
         <Btn onClick={openNew} color="#e17055">+ New Short</Btn>
       </div>
 
-      {/* Upload buttons */}
-      <VideoUploadBtn bucket="short-videos" />
+     
 
       {showForm && (
         <div style={{
@@ -671,6 +681,19 @@ const del = async (id) => {
             {editing ? 'Edit Short' : 'New Short'}
           </div>
           <Input value={form.title || ''} onChange={(v) => setForm((f) => ({ ...f, title: v }))} placeholder="Short title" />
+          
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <Input 
+              value={form.video_url || ''} 
+              onChange={(v) => setForm((f) => ({ ...f, video_url: v }))} 
+              placeholder="Video URL" 
+              style={{ flex: 1, minWidth: '200px' }} 
+            />
+            <VideoUploadBtn 
+              bucket="short-videos" 
+              onUploaded={(url) => setForm((f) => ({ ...f, video_url: url }))} 
+            />
+          </div>
           <Select value={form.domain || DOMAINS[0]} onChange={(v) => setForm((f) => ({ ...f, domain: v }))} options={DOMAINS} />
           <div style={{ display: 'flex', gap: 'clamp(6px, 1vw, 10px)', flexWrap: 'wrap' }}>
             <Select
